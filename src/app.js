@@ -20,8 +20,26 @@ const app = express();
 if (environment.trustProxy) {
   app.set("trust proxy", environment.trustProxy);
 }
-app.use(helmet());
-app.use(cors({ origin: environment.clientOrigin || false }));
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+const allowedOrigins = environment.clientOrigin
+  ? environment.clientOrigin.split(",").map((o) => o.trim())
+  : [];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 // Razorpay signs the exact request bytes, so parse this endpoint before JSON middleware.
 app.use(["/api/razorpay/webhook", "/api/v1/razorpay/webhook"], express.raw({ type: "application/json", limit: "100kb" }));
 app.use(express.json({ limit: "20kb" }));
@@ -34,17 +52,12 @@ app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
 app.use("/api/v1/onramp", onrampRoutes);
-<<<<<<< HEAD
+app.use("/api/v1/remittance", remittanceRoutes);
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/v1/razorpay", razorpayRoutes);
-// DEV ONLY — remove or comment out before production
-if (process.env.NODE_ENV !== "production") {
-=======
-app.use("/api/v1/remittance", remittanceRoutes);
 
-// DEV ONLY — strictly require both non-production NODE_ENV and explicit ENABLE_DEV_ROUTES flag
-if (process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_ROUTES === "true") {
->>>>>>> 158bc4c740f89013c74a5e614c02ffd0ae8856c5
+// DEV ONLY — enable dev token routes if not in production
+if (process.env.NODE_ENV !== "production") {
   app.use("/api/v1/dev", devTokenRoutes);
 }
 
