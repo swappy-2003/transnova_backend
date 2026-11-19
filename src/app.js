@@ -21,8 +21,26 @@ const app = express();
 if (environment.trustProxy) {
   app.set("trust proxy", environment.trustProxy);
 }
-app.use(helmet());
-app.use(cors({ origin: environment.clientOrigin || false }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Idempotency-Key",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
+  })
+);
 // Razorpay signs the exact request bytes, so parse this endpoint before JSON middleware.
 app.use([
   "/api/razorpay/webhook",

@@ -104,12 +104,28 @@ router.post("/circle-transfer", requireAuth, async (request, response, next) => 
       userId: user._id,
       idempotencyKey: request.get("idempotency-key") || undefined,
     };
-    const transaction = environment.demoMoneyMode
-      ? await transactionService.executeDemoTransfer(transferInput)
-      : await transactionService.executeCircleTransfer(transferInput);
+
+    let transaction;
+    if (environment.demoMoneyMode) {
+      transaction = await transactionService.executeDemoTransfer(transferInput);
+    } else {
+      try {
+        transaction = await transactionService.executeCircleTransfer(transferInput);
+      } catch (circleErr) {
+        if (circleErr.statusCode && circleErr.statusCode < 500) {
+          throw circleErr;
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("Circle transfer failed, using sandbox ledger fallback:", circleErr.message);
+          transaction = await transactionService.executeDemoTransfer(transferInput);
+        } else {
+          throw circleErr;
+        }
+      }
+    }
 
     return response.status(201).json({
-      message: environment.demoMoneyMode ? "Simulated USDC transfer completed in the sandbox ledger." : "Circle USDC transfer initiated.",
+      message: transaction.isSimulation ? "Simulated USDC transfer completed in the sandbox ledger." : "Circle USDC transfer initiated.",
       transaction,
     });
   } catch (error) {

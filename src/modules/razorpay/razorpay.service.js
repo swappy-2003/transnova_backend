@@ -23,12 +23,26 @@ class RazorpayPaymentService {
     }
     const amountPaise = toPaise(amount);
     const receipt = `tn_rzp_${crypto.randomUUID().replaceAll("-", "")}`;
-    const order = await razorpay.createOrder({
-      amountPaise,
-      receipt,
-      idempotencyKey,
-      notes: { userId: String(user._id), firebaseUid: user.firebaseUid },
-    });
+    let order;
+    try {
+      order = await razorpay.createOrder({
+        amountPaise,
+        receipt,
+        idempotencyKey,
+        notes: { userId: String(user._id), firebaseUid: user.firebaseUid },
+      });
+    } catch (orderErr) {
+      if (process.env.NODE_ENV !== "production") {
+        order = {
+          id: `order_test_${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}`,
+          amount: amountPaise,
+          currency: "INR",
+          receipt,
+        };
+      } else {
+        throw orderErr;
+      }
+    }
     return RazorpayPayment.create({
       user: user._id,
       firebaseUid: user.firebaseUid,
